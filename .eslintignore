@@ -1,0 +1,22 @@
+# common
+.swc/
+
+# compiled output
+.next/
+out/
+dist/
+*.d.ts
+tsconfig.tsbuildinfo
+
+# jest
+coverage/
+
+# npm
+node_modules/
+package-lock.json
+
+# prism
+prism/generated/
+
+# docker
+docker/

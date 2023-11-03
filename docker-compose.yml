@@ -1,0 +1,48 @@
+version: "3"
+
+services:
+  app:
+    build:
+        context: .
+        dockerfile: docker/node/Dockerfile
+    tty: true
+    stdin_open: true
+    env_file:
+      - .env
+    depends_on:
+      - db
+    ports:
+      - "${APP_FORWARDED_PORT:-3000}:${APP_PORT:-3000}"
+    working_dir: /app
+    volumes:
+        - .:/app
+    command: sh -c "npm install && npm run dev"
+
+  db:
+    image: mysql:8.1
+    env_file:
+      - .env
+    environment:
+        MYSQL_DATABASE: ${DB_NAME}
+        MYSQL_USER: ${DB_USER}
+        MYSQL_PASSWORD: ${DB_PASSWORD}
+        MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "${DB_FORWARDED_PORT:-33060}:${DB_PORT:-3306}"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./docker/mysql/initdb.d:/docker-entrypoint-initdb.d
+
+  mail:
+    image: axllent/mailpit:latest
+    env_file:
+      - .env
+    environment:
+      TZ: Asia/Tokyo
+      MP_SMTP_AUTH_ACCEPT_ANY: true
+      MP_SMTP_AUTH_ALLOW_INSECURE: true
+    ports:
+      - "${LOCAL_MAIL_UI_FORWARDED_PORT:-8025}:8025"
+
+volumes:
+    db_data:

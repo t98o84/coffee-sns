@@ -1,0 +1,350 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+generator zod {
+  provider                         = "zod-prisma-types"
+  output                           = "./schemas" // default is ./generated/zod
+  useMultipleFiles                 = false // default is false
+  writeBarrelFiles                 = true // default is true
+  createInputTypes                 = true // default is true
+  createModelTypes                 = true // default is true
+  addInputTypeValidation           = true // default is true
+  addIncludeType                   = true // default is true
+  addSelectType                    = true // default is true
+  validateWhereUniqueInput         = false // default is false
+  createOptionalDefaultValuesTypes = false // default is false
+  createRelationValuesTypes        = false // default is false
+  createPartialTypes               = false // default is false
+  useDefaultValidators             = true // default is true
+  coerceDate                       = true // default is true
+  writeNullishInModelTypes         = false // default is false
+  // prismaClientPath                 = "./path/to/prisma/client" // default is client output path
+}
+
+generator fabbrica {
+  provider = "prisma-fabbrica"
+  output = "./factories"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DB_URL")
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
+}
+
+//==================================================
+// Auth
+//==================================================
+
+model Account {
+  id                String   @id @default(uuid())
+  userId            String   @map("user_id")
+  type              String /// @zod.string.max(150)
+  provider          String /// @zod.string.max(150)
+  providerAccountId String   @map("provider_account_id") /// @zod.string.max(150)
+  refresh_token     String?  @db.Text /// @zod.string.max(50000)
+  access_token      String?  @db.Text /// @zod.string.max(50000)
+  expires_at        Int?
+  token_type        String? /// @zod.string.max(150)
+  scope             String? /// @zod.string.max(150)
+  id_token          String?  @db.Text /// @zod.string.max(50000)
+  session_state     String? /// @zod.string.max(150)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique @map("session_token") /// @zod.string.max(150)
+  userId       String   @map("user_id")
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  username      String    @unique /// @zod.string.regex(/^[a-z0-9-]{1,50}$/);
+  name          String? /// @zod.string.max(100)
+  email         String?   @unique /// @zod.string.email()
+  emailVerified DateTime? @map("email_verified")
+  image         String? /// @zod.string.max(150)
+  avatarId      String?   @map("avatar_id")
+  introduction  String?   @map("introduction") @db.VarChar(1000) /// @zod.string.max(1000)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  avatar      File?        @relation(fields: [avatarId], references: [id], onUpdate: Cascade)
+  accounts    Account[]
+  sessions    Session[]
+
+  shops       Shop[] @relation(name: "created_by")
+  refShop       Shop[] @relation(name: "refShop")
+
+  // farms    Farm[]
+  // beans    Bean[]
+  // roasters Rouaster[]
+  @@map("users")
+}
+
+model VerificationToken {
+  identifier String /// @zod.string.max(150)
+  token      String   @unique /// @zod.string.max(150)
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verificationtokens")
+}
+
+//==================================================
+// File
+//==================================================
+
+model File {
+  id           String   @id @default(uuid())
+  disk         String /// @zod.string.max(150)
+  path         String? /// @zod.string.max(150)
+  name         String /// @zod.string.max(150)
+  originalName String   @map("original_name") /// @zod.string.max(150)
+  mimeType     String   @map("mime_type") /// @zod.string.max(150)
+  size         Int
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  users User[]
+
+  @@unique([disk, path, name])
+  @@map("files")
+}
+
+//==================================================
+// Url
+//==================================================
+
+model Url {
+  id        String   @id @default(uuid())
+  url       String   @db.VarChar(2048) /// @zod.string.url
+  label     String? /// @zod.string.max(150)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  shops Shop[]
+
+  @@map("urls")
+}
+
+//==================================================
+// Shop
+//==================================================
+
+model Shop {
+  id          String  @id @default(uuid())
+  name        String /// @zod.string.max(150)
+  description String? @db.VarChar(1000) /// @zod.string.max(1000)
+
+  refId String? @map("ref_id")
+  refShop   User?   @relation(name: "refShop", fields: [refId], references: [id], onUpdate: Cascade)
+
+  createdById String @map("created_by_id")
+  createdBy   User   @relation(name: "created_by", fields: [createdById], references: [id], onUpdate: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  links Url[]
+
+  @@unique([createdById, name])
+  @@map("shops")
+}
+
+// //==================================================
+// // Bean
+// //==================================================
+//
+// model Bean {
+//   id          String   @id @default(uuid())
+//   name        String /// @zod.string.max(150)
+//   description String?  @db.VarChar(1000) /// @zod.string.max(1000)
+//
+//   createdAt   DateTime @default(now()) @map("created_at")
+//   updatedAt   DateTime @updatedAt @map("updated_at")
+//
+//   createdById String? @map("created_by_id")
+//   createdBy   User?   @relation(fields: [createdById], references: [id], onUpdate: Cascade)
+//
+//   usedBlends    Blend[] @relation("blendedBean")
+//   blendedBlends Blend[] @relation("usedBean")
+//
+//   farms     Farm[]
+//   havest    Havest[]
+//   refinings Refining[]
+//   roastings Roasting[]
+//   awards    Award[]
+//
+//   @@map("beans")
+// }
+//
+// model Farm {
+//   id          String @id @default(uuid())
+//   name        String /// @zod.string
+//   description String? @db.VarChar(1000) /// @zod.string
+//   country     String? /// @zod.string.max(150)
+//   region      String? /// @zod.string.max(150)
+//   plantation  String? /// @zod.string.max(150)
+//
+//   createdById String? @map("created_by_id")
+//   createdBy   User?   @relation(fields: [createdById], references: [id], onUpdate: Cascade)
+//
+//   beans Bean[]
+//
+//   @@map("farms")
+// }
+//
+// model Blend {
+//   blendedId String @map("blended_bean_id") /// @zod.string.uuid
+//   usedId    String @map("used_id") /// @zod.string.uuid
+//   ratio     Int? /// @zod.number.min(0).max(100)
+//
+//   blended Bean @relation(name: "blendedBean", fields: [blendedId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+//   used    Bean @relation(name: "usedBean", fields: [usedId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+//
+//   @@id([blendedId, usedId])
+//   @@map("blends")
+// }
+//
+// model Havest {
+//   id        String   @id @default(uuid())
+//   startAt   DateTime @map("start_at")
+//   endAt     DateTime @map("end_at")
+//   method    String? /// @zod.string.max(150)
+//
+//   createdById String? @map("created_by_id")
+//   createdBy   User?   @relation(fields: [createdById], references: [id], onUpdate: Cascade)
+//
+//   beans Bean[]
+//
+//   @@map("havests")
+// }
+//
+// model Refining {
+//   id          String  @id @default(uuid())
+//   method      String /// @zod.string.max(150)
+//   description String? @db.VarChar(1000) /// @zod.string.max(1000)
+//
+//   createdById String? @map("created_by_id")
+//   createdBy   User?   @relation(fields: [createdById], references: [id], onUpdate: Cascade)
+//
+//   beans Bean[]
+//
+//   @@map("refinings")
+// }
+//
+// model Roasting {
+//   id          String   @id @default(uuid())
+//   degree      String /// @zod.string.max(150)
+//   description String?  @db.VarChar(1000) /// @zod.string.max(1000)
+//   roastedAt   DateTime @map("roasted_at")
+//
+//   createdById String? @map("created_by_id")
+//   createdBy   User?   @relation(fields: [createdById], references: [id], onUpdate: Cascade)
+//
+//   beans     Bean[]
+//   rouasters Rouaster[]
+//
+//   @@map("roastings")
+// }
+//
+// model Rouaster {
+//   id          String  @id @default(uuid())
+//   roasterId   String? @map("roaster_id")
+//   name        String? /// @zod.string.max(150)
+//   description String? @db.VarChar(1000) /// @zod.string.max(1000)
+//
+//   roaster   User?      @relation(fields: [roasterId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+//   roastings Roasting[]
+//
+//   @@map("rouasters")
+// }
+//
+// model Award {
+//   id           String  @id @default(uuid())
+//   competitions String /// @zod.string.max(150)
+//   name         String /// @zod.string.max(150)
+//   description  String? @db.VarChar(1000) /// @zod.string.max(1000)
+//
+//   beans Bean[]
+//
+//   @@map("awards")
+// }
+
+//==================================================
+// Recpie
+//==================================================
+
+// model Recpie {
+//   id          String @id @default(uuid())
+//   title       String /// @zod.string
+//   description String @db.VarChar(1000) /// @zod.string
+//
+//   shopName         String? @map("shop_name")
+//   beanName         String? @map("bean_name")
+//   extractionMethod String? @map("extraction_method")
+//
+//   createdById String? @map("created_by_id")
+//   createdBy   User?   @relation(fields: [createdById], references: [id], onUpdate: Cascade)
+//
+//   createdAt DateTime @default(now()) @map("created_at")
+//   updatedAt DateTime @updatedAt @map("updated_at")
+//
+//   ingredients Ingredient[]
+//   procedures  Procedure[]
+//   scales      Scale
+//
+//   @@map("recpies")
+// }
+//
+// model Ingredient {
+//   id       String @id @default(uuid())
+//   name     String /// @zod.string.max(150)
+//   quantity String /// @zod.string.max(150)
+//
+//   recpieId String? @map("recpie_id")
+//   recpie   Recpie? @relation(fields: [recpieId], references: [id], onUpdate: Cascade)
+//
+//   createdAt DateTime @default(now()) @map("created_at")
+//   updatedAt DateTime @updatedAt @map("updated_at")
+//
+//   @@map("ingredients")
+// }
+//
+// model Procedure {
+//   order    Int /// @zod.number.int.min(1)
+//   content  String @db.VarChar(1000) /// @zod.string
+//
+//   recpieId String? @map("recpie_id")
+//   recpie   Recpie? @relation(fields: [recpieId], references: [id], onUpdate: Cascade)
+//
+//   createdAt DateTime @default(now()) @map("created_at")
+//   updatedAt DateTime @updatedAt @map("updated_at")
+//
+//   @@unique([recpieId, order])
+//   @@map("procedures")
+// }
+//
+// model Scale {
+//   aroma      Int /// @zod.number.int.min(0).max(5)
+//   sweetness  Int /// @zod.number.int.min(0).max(5)
+//   bitterness Int /// @zod.number.int.min(0).max(5)
+//   sourness   Int /// @zod.number.int.min(0).max(5)
+//   body       Int /// @zod.number.int.min(0).max(5)
+// }
